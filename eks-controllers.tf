@@ -21,9 +21,7 @@ resource "helm_release" "aws_load_balancer_controller" {
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
   namespace  = "kube-system"
-
   version    = var.alb_controller_version
-
   depends_on = [module.eks]
 
   values = [
@@ -66,9 +64,7 @@ resource "helm_release" "cluster_autoscaler" {
   repository = "https://kubernetes.github.io/autoscaler"
   chart      = "cluster-autoscaler"
   namespace  = "kube-system"
-
   version    = var.cluster_autoscaler_version
-
   depends_on = [module.eks]
 
   values = [
@@ -100,9 +96,7 @@ resource "helm_release" "metrics_server" {
   repository = "https://kubernetes-sigs.github.io/metrics-server/"
   chart      = "metrics-server"
   namespace  = "kube-system"
-
   version    = var.metrics_server_version
-
   depends_on = [module.eks]
 
   values = [
@@ -111,6 +105,59 @@ resource "helm_release" "metrics_server" {
       nodeSelector = {
         role = "core"
       }
+    })
+  ]
+}
+
+
+
+# 4. AWS for Fluent Bit (Centralized Logging to CloudWatch)
+
+module "fluentbit_irsa_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.30"
+
+  role_name = "${var.cluster_name}-fluentbit"
+  
+  # AWS provides a built-in policy for Fluent Bit to write to CloudWatch
+  attach_cloudwatch_observability_policy = true
+
+  oidc_providers = {
+    ex = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:aws-for-fluent-bit"]
+    }
+  }
+}
+
+resource "helm_release" "aws_for_fluent_bit" {
+  name       = "aws-for-fluent-bit"
+  repository = "https://aws.github.io/eks-charts"
+  chart      = "aws-for-fluent-bit"
+  namespace  = "kube-system"
+  version    = var.fluentbit_version
+  depends_on = [module.eks]
+
+  values = [
+    yamlencode({
+      serviceAccount = {
+        create = true
+        name   = "aws-for-fluent-bit"
+        annotations = {
+          "eks.amazonaws.com/role-arn" = module.fluentbit_irsa_role.iam_role_arn
+        }
+      }
+      cloudWatchLogs = {
+        enabled = true
+        region  = var.aws_region
+        logGroupName = "/aws/eks/${var.cluster_name}/application-logs"
+      }
+      # Runs on all nodes as a DaemonSet to collect logs
+      tolerations = [
+        {
+          operator = "Exists"
+        }
+      ]
     })
   ]
 }

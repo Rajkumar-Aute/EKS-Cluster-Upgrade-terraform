@@ -60,3 +60,45 @@ variable "metrics_server_version" {
   type        = string
   default = "latest"
 }
+
+variable "argocd_version" {
+  description = "Helm chart version for ArgoCD"
+  type        = string
+  default     = "latest"
+}
+
+variable "prometheus_version" {
+  description = "Helm chart version for Kube-Prometheus-Stack (Prometheus & Grafana)"
+  type        = string
+  default     = "latest"
+}
+
+variable "fluentbit_version" {
+  description = "Helm chart version for AWS Fluent Bit (Logging)"
+  type        = string
+}
+
+variable "external_secrets_version" {
+  description = "Helm chart version for External Secrets Operator"
+  type        = string
+}
+
+variable "cert_manager_version" {
+  description = "Helm chart version for Cert-Manager"
+  type        = string
+}
+
+variable "kyverno_version" {
+  description = "Helm chart version for Kyverno Policy Engine"
+  type        = string
+}
+
+variable "velero_version" {
+  description = "Helm chart version for Velero (Disaster Recovery)"
+  type        = string
+}
+
+variable "istio_version" {
+  description = "Helm chart version for Istio Service Mesh"
+  type        = string
+}
