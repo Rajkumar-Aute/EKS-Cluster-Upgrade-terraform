@@ -8,5 +8,14 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = var.AWS_REGION
+  default_tags {
+    # These tags will be applied to all AWS resources created by this Terraform configuration, unless overridden at the resource level.
+    tags = {
+      Project     = "EKS-Upgrade-lab-Setup"
+      Environment = "sandbox"
+      ManagedBy   = "Terraform"
+      CostCenter  = "Learning"
+    }
+  }
 }
