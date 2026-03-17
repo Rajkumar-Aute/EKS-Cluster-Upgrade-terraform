@@ -19,11 +19,16 @@ module "eks" {
   # Automatically grant cluster admin permissions to the IAM user/role running this Terraform
   enable_cluster_creator_admin_permissions = true
 
+  # Karpenter needs to discover the node security group to attach to new nodes
+  node_security_group_tags = {
+    "karpenter.sh/discovery" = var.cluster_name
+  }
+
   # Configure Managed Node Groups
   eks_managed_node_groups = {
     spot_node_group = {
       # General configuration      
-      name            = "${var.cluster_name}-spot-node-group"
+      name            = "${var.cluster_name}-spot"
       description     = "A EKS Upgrade Practice spot node group"
       use_name_prefix = true # If true, Terraform appends random characters to the name
 
@@ -35,8 +40,8 @@ module "eks" {
       ami_type = "AL2023_x86_64_STANDARD"
 
       # Scaling (Requires Cluster Autoscaler or Karpenter to work)
-      min_size     = var.min-node-groups-nodes # Absolute minimum number of nodes
-      max_size     = var.max-node-groups-nodes # Maximum number of nodes the autoscaler can spin up
+      min_size     = var.min-node-groups-nodes     # Absolute minimum number of nodes
+      max_size     = var.max-node-groups-nodes     # Maximum number of nodes the autoscaler can spin up
       desired_size = var.desired-node-groups-nodes # The initial target number of nodes to deploy
 
       # Rolling updates and lifecycle settings
@@ -96,7 +101,7 @@ module "eks" {
 
       # IAM (Identity & Access Management)
       iam_role_name            = "spot-node-group-role"
-      iam_role_use_name_prefix = false
+      iam_role_use_name_prefix = true # If true, Terraform appends random characters to the name to ensure uniqueness
 
       # Attach extra IAM policies to your EC2 nodes. 
       # (e.g., giving nodes the ability to pull from S3 or use SSM Session Manager)
@@ -114,3 +119,33 @@ module "eks" {
     }
   }
 }
+
+# Karpenter is a next-generation cluster autoscaler that can rapidly provision new nodes in response to unschedulable pods. It offers more flexibility and faster scaling than the traditional Cluster Autoscaler, especially in environments with Spot instances.
+
+module "karpenter" {
+  source  = "terraform-aws-modules/eks/aws//modules/karpenter"
+  version = "~> 20.37"
+
+  cluster_name = module.eks.cluster_name
+
+  # Enable permissions required for Karpenter v1.0+
+  enable_v1_permissions = true
+
+  # Create IAM Role for Service Accounts (IRSA) for the Karpenter controller pods
+  enable_irsa            = true
+  irsa_oidc_provider_arn = module.eks.oidc_provider_arn
+
+  # Create the IAM role that Karpenter will attach to the underlying EC2 instances it provisions
+  create_node_iam_role = true
+  node_iam_role_name   = "${var.cluster_name}-karpenter-node"
+
+  # Create SQS Queue and EventBridge rules to gracefully handle Spot instance interruptions
+  enable_spot_termination = true
+
+  tags = {
+    Environment = "Learning"
+    ManagedBy   = "Terraform"
+  }
+}
+
+

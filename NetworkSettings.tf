@@ -26,3 +26,10 @@ locals {
   ]
 }
 
+# Karpenter requires subnets to be tagged so it knows where to launch nodes.
+resource "aws_ec2_tag" "karpenter_subnets" {
+  for_each    = toset(local.supported_subnets)
+  resource_id = each.value
+  key         = "karpenter.sh/discovery"
+  value       = var.cluster_name
+}
